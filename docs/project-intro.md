@@ -101,7 +101,7 @@ graph TD
 
 ### 7-2. 하네스(Harness) 구성 및 슬래시 커맨드 활용
 * **Planning Mode Workflow (이단 가용 프로토콜):**
-  * 코드 수정 전 `implementation_plan.md`를 빌드하여 유저에게 검토 및 승인 피드백(RequestFeedback: true)을 먼저 받아 안전망을 확보한 뒤, `task.md` checklists를 마크업해 나가는 자율 협업 구조 준수.
+  * 코드 수정 전 `docs/implementation_plan.md`를 빌드하여 유저에게 검토 및 승인 피드백(RequestFeedback: true)을 먼저 받아 안전망을 확보한 뒤, `docs/task.md` checklists를 마크업해 나가는 자율 협업 구조 준수.
 * **`/grill-me` (대화식 디베이트 인터뷰):**
   * 스키마 제약이 있는 RDBMS(AlloyDB) 배제 사유, iOS Safari 물리 진동 차단 한계 극복을 위한 주파수 피치 매핑, 3점 및 5점 터치 제스처 인체공학적 타당성 등 아키텍처 핵심 결정의 검증을 위해 **AI 1:1 디베이트 인터뷰**를 기동해 설계를 견고하게 락인.
 * **`/goal` (장기 고도화 자율 에이전트):**
@@ -131,6 +131,5 @@ graph TD
   - **Cloud Firestore** (자가 성장 NoSQL 데이터베이스)
   - **Google BigQuery** (실시간 분석 및 스트리밍 로그 적재)
   - **Memorystore Redis** (컨테이너 분산 Rate Limiting 동기화)
-
 
 

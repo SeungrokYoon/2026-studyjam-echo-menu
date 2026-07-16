@@ -82,7 +82,7 @@ Always respect and design within our allocated AI Model Matrix:
 ## 🚦 4. Agentic Workflow Expectations
 
 If you are running a task in this repo:
-* **Respect Planning Mode:** Create/update `implementation_plan.md` first, flag `RequestFeedback: true`, wait for explicit approval, and track milestones sequentially in `task.md`.
+* **Respect Planning Mode:** Create/update `docs/implementation_plan.md` first, flag `RequestFeedback: true`, wait for explicit approval, and track milestones sequentially in `docs/task.md`.
 * **Clean Code & Comments:** Retain all non-disruptive Korean accessibility voice instructions and multiligual resource dictionaries. Keep code heavily commented.
 * **Verify Builds:** Run `pnpm run build` to confirm TypeScript type-safety before considering your task complete.
 
