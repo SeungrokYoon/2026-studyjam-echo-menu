@@ -17,6 +17,18 @@ async function installBrowserStubs(page: Page, savedLanguage?: string) {
 
     (window as any).__spokenUtterances = [];
 
+    Object.defineProperties(HTMLVideoElement.prototype, {
+      readyState: { configurable: true, get: () => HTMLMediaElement.HAVE_ENOUGH_DATA },
+      videoWidth: { configurable: true, get: () => 480 },
+      videoHeight: { configurable: true, get: () => 700 }
+    });
+    HTMLMediaElement.prototype.play = async () => undefined;
+    HTMLCanvasElement.prototype.getContext = ((contextId: string) => {
+      if (contextId === "2d") return { drawImage() {} } as CanvasRenderingContext2D;
+      return null;
+    }) as any;
+    HTMLCanvasElement.prototype.toDataURL = () => "data:image/jpeg;base64,dGVzdA==";
+
     Object.defineProperty(window, "speechSynthesis", {
       configurable: true,
       value: {
@@ -125,6 +137,18 @@ async function longPressTouchpad(page: Page) {
       changedTouches: [touch]
     }));
   }, { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+}
+
+async function reachKioskNavigation(page: Page) {
+  await page.goto("/");
+  await doubleTapTouchpad(page, 0.12, 0.18);
+  await expect(page.locator("#permission-choice-surface")).toBeVisible();
+  await page.touchscreen.tap(24, 180);
+  await expect(page.locator("#flow-title")).toHaveText("스타벅스로 들었습니다", { timeout: 10_000 });
+  await doubleTapTouchpad(page, 0.88, 0.5);
+  await expect(page.locator("#flow-primary-action")).toHaveText("이 매장이 맞습니다", { timeout: 10_000 });
+  await doubleTapTouchpad(page, 0.88, 0.5);
+  await expect(page.locator("#flow-title")).toHaveText("키오스크를 찾고 있습니다");
 }
 
 test("서비스 진입 직후 7개 언어 안내를 순서대로 재생한다", async ({ page }) => {
@@ -261,6 +285,74 @@ test("기여 기능은 주문 화면과 분리되어 동작한다", async ({ pag
 
   await page.locator("#contrib-username").fill("접근성테스터");
   await page.locator("#contrib-venue").fill("스타벅스 강남역점");
+  await page.locator("#contrib-menu-images").setInputFiles(Array.from({ length: 10 }, (_, index) => ({
+    name: `menu-${index + 1}.png`,
+    mimeType: "image/png",
+    buffer: Buffer.from("menu-board-image")
+  })));
+  await expect(page.locator("#contrib-image-count")).toHaveText("10 / 10장 선택됨");
   await page.locator("#btn-submit-contribution").click();
   await expect(page.locator("#contrib-status-msg")).toContainText("기여 성공");
+});
+
+test("메뉴판 사진은 10장까지만 선택할 수 있다", async ({ page }) => {
+  await installBrowserStubs(page);
+  await page.goto("/contribute");
+
+  await page.locator("#contrib-menu-images").setInputFiles(Array.from({ length: 11 }, (_, index) => ({
+    name: `menu-${index + 1}.jpg`,
+    mimeType: "image/jpeg",
+    buffer: Buffer.from("menu-board-image")
+  })));
+
+  await expect(page.locator("#contrib-status-msg")).toContainText("최대 10장");
+  await expect(page.locator("#contrib-image-count")).toHaveText("0 / 10장 선택됨");
+});
+
+test("서버도 메뉴판 사진 11장 업로드를 거절한다", async ({ request }) => {
+  const menuImages = Array.from({ length: 11 }, (_, index) => ({
+    name: `menu-${index + 1}.png`,
+    mimeType: "image/png",
+    data: "data:image/png;base64,dGVzdA=="
+  }));
+  const response = await request.post("/api/contribute", {
+    data: { username: "제한테스터", venueName: "테스트 매장", menuImages }
+  });
+
+  expect(response.status()).toBe(400);
+  await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("최대 10장") });
+});
+
+test("프레임 분석 요청을 겹치지 않고 4초 간격으로 보낸다", async ({ page }) => {
+  await installBrowserStubs(page);
+
+  const requestStartedAt: number[] = [];
+  let releaseFirstRequest!: () => void;
+  const firstRequestHeld = new Promise<void>((resolve) => {
+    releaseFirstRequest = resolve;
+  });
+
+  await page.route("**/api/analyze-frame", async (route) => {
+    requestStartedAt.push(Date.now());
+    if (requestStartedAt.length === 1) await firstRequestHeld;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        context_message: "키오스크를 찾고 있습니다.",
+        steer_direction: "left",
+        distance_info: "왼쪽으로 이동",
+        target_hit: false
+      })
+    });
+  });
+
+  await reachKioskNavigation(page);
+  await expect.poll(() => requestStartedAt.length, { timeout: 5_000 }).toBe(1);
+  await page.waitForTimeout(2_200);
+  expect(requestStartedAt).toHaveLength(1);
+
+  releaseFirstRequest();
+  await expect.poll(() => requestStartedAt.length, { timeout: 5_000 }).toBe(2);
+  expect(requestStartedAt[1] - requestStartedAt[0]).toBeGreaterThanOrEqual(3_500);
 });

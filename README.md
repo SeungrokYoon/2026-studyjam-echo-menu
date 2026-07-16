@@ -5,6 +5,8 @@
 ### 🔗 실시간 라이브 데모 배포 주소
 **[https://echo-menu-app-3f67e6oi2a-du.a.run.app](https://echo-menu-app-3f67e6oi2a-du.a.run.app)**
 
+현재 Cloud Run 배포 리비전: `echo-menu-app-00005-tnw` (2026-07-16, 트래픽 100%)
+
 ---
 
 ## 💡 프로젝트 기획 배경 및 문제 정의
@@ -41,7 +43,9 @@ flowchart TD
 ```
 
 ### 1. 자가성장 데이터베이스 (Self-Growing DB)
-비장애인 기여자가 신규 매장의 키오스크 화면을 사진으로 간단히 찍어 등록하면, 시스템 내부적으로 미리 구축된 업종별 템플릿 정보(`public/preset_kiosk_data.json`)와 대조하여 좌표 구조를 생성하고 로컬 및 클라우드 데이터 캐시에 보관합니다. 플랫폼 스스로 정보를 모으고 정교화해 나가는 생태계를 구성합니다.
+비장애인 기여자가 신규 매장의 키오스크 메뉴판 사진을 한 번에 최대 10장까지 등록하면, 시스템 내부적으로 미리 구축된 업종별 템플릿 정보(`public/preset_kiosk_data.json`)와 대조할 수 있는 기여 기록으로 보관합니다. JPG, PNG, WebP를 지원하며 사진당 4MB, 전체 20MB 제한을 브라우저와 서버에서 함께 검증합니다.
+
+현재 해커톤 데모는 업로드 이미지와 메타데이터를 Cloud Run 인스턴스의 `db_cache.json`에 저장합니다. 인스턴스 교체 후에도 영구 보존해야 하는 운영 환경에서는 Cloud Storage와 Firestore 저장소로 교체해야 합니다.
 
 ### 2. 선한 게이미피케이션 (Leaderboard)
 기여를 마친 사용자들에게는 기여 빈도와 정확성에 따라 포인트를 부여하고 **"명예의 전당(Leaderboard)"**에 기여자 이름을 올림으로써 자발적이고 재미있는 소셜 기여 모델을 고취합니다.
@@ -57,7 +61,7 @@ graph TD
     User([시각장애인 사용자 / 기여자]) -->|1. 모바일 마이크 / 카메라 촬영 API| CloudRun[Google Cloud Run <br> asia-northeast3]
     
     subgraph Google Cloud Platform (Seoul Region)
-        CloudRun -->|클라이언트 에셋 서빙| Frontend[React / Vite + TS Frontend]
+        CloudRun -->|클라이언트 에셋 서빙| Frontend[Vite + TypeScript Frontend]
         CloudRun -->|수행 지표 및 처리 로그 적재| BigQuery[(Google BigQuery)]
         CloudRun -.->|실제 연동용 NoSQL| Firestore[(Cloud Firestore)]
         CloudRun -->|개발 및 빠른 로컬 캐시 데모| LocalDB[(db_cache.json)]
@@ -86,8 +90,10 @@ sequenceDiagram
 
     %% 기여자 흐름
     Note over Contributor, DB: [기여자: 매장 데이터 수집 및 선순환 등록]
-    Contributor->>Web: 새로운 지점 키오스크 카메라 캡처 등록
-    Web->>Server: 이미지 업로드 및 메뉴 버튼 대략 매핑 요청
+    Contributor->>Web: 메뉴판 사진 1~10장 선택
+    Web->>Web: 형식·개별 4MB·전체 20MB 제한 검증
+    Web->>Server: 이미지 배열과 매장 정보 업로드
+    Server->>Server: 최대 10장 및 Data URL 형식 재검증
     Server->>DB: 신규 매장 Self-Growing DB 등록 & 기여자 랭킹 포인트 적립
 
     %% 수혜자 흐름
@@ -97,7 +103,7 @@ sequenceDiagram
     Server->>DB: 캐시된 매장 키오스크 구조 로드
     Server-->>Web: 매장 및 메뉴판 초기 정보 오디오 브리핑
 
-    loop 실시간 실시간 비디오 가이드 루프 (FPS)
+    loop 4초 주기 비디오 가이드 루프 (이전 요청 완료 후 진행)
         Web->>Server: 현재 카메라 캡처 프레임 (Base64) 전송
         Server->>Gemini: 이미지 + 손위치 분석 지시 (Prompt 전달)
         Gemini-->>Server: JSON 가이드 피드백 도출 (State, steer_direction, distance_info)
@@ -124,12 +130,22 @@ cp .env.example .env
 ### 2. 패키지 설치 및 실행
 ```bash
 # 1. 의존성 패키지 설치
-npm install
+pnpm install
 
 # 2. 클라이언트 빌드 및 정적 에셋 컴파일
-npm run build
+pnpm build
 
 # 3. 로컬 Express 백엔드 서버 실행
-npm start
+pnpm start
 ```
 서버 가동이 성공적으로 완료되면 웹 브라우저를 열고 `http://localhost:3000`에 접속하여 Echo-Menu 3.0 가이드 테스트 버전을 직접 조작할 수 있습니다.
+
+### 3. 품질 검증
+
+```bash
+pnpm typecheck
+pnpm test:e2e
+pnpm build
+```
+
+프레임 분석 루프는 음성 안내가 중간에 끊기지 않도록 4초 간격으로 실행되며, 이전 `/api/analyze-frame` 요청이 진행 중이면 다음 프레임을 건너뜁니다.

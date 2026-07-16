@@ -36,19 +36,24 @@ graph LR
 
 ---
 
-## 🎥 3. 1초 주기 비디오 프레임 전처리 및 송신
-* 브라우저 웹캠 비디오 스트림을 1초 간격으로 Canvas에 드로잉합니다.
-* 네트워크 전송 오버헤드와 Gemini 비전 로드를 줄이기 위해 해상도를 `480x700`으로 좁히고, `canvas.toDataURL("image/jpeg", 0.6)` 스펙을 적용해 **화질 60%의 JPEG Base64 문자열**로 경량 압축 처리하여 POST 전송합니다.
+## 🎥 3. 4초 주기 비디오 프레임 전처리 및 송신
+* 브라우저 웹캠 비디오 스트림을 4초 간격으로 Canvas에 드로잉해 `/api/analyze-frame`으로 전송합니다. 분석 안내가 음성 재생 속도를 앞지르지 않도록 기존 1초 주기보다 빈도를 낮췄습니다.
+* 이전 프레임 분석 요청이 완료되지 않은 동안에는 다음 주기 요청을 건너뛰어 응답 순서 역전과 중복 상태 전이를 방지합니다.
+* 네트워크 전송 오버헤드와 Gemini 비전 로드를 줄이기 위해 현재 카메라 해상도를 유지한 채 `canvas.toDataURL("image/jpeg", 0.72)`로 JPEG Base64 문자열을 생성합니다.
+
+## 🖼️ 4. 기여자 메뉴판 다중 이미지 업로드
+* 기여자는 한 번의 등록에서 JPG, PNG, WebP 메뉴판 사진을 1장부터 최대 10장까지 선택할 수 있습니다.
+* 브라우저에서 사진당 4MB, 전체 20MB 제한과 MIME 형식을 먼저 검증하고 선택 장수를 `aria-live` 상태 메시지와 함께 안내합니다.
+* 검증된 이미지는 Data URL 배열로 `/api/contribute`에 전송하며 업로드 중 중복 제출을 막기 위해 제출 버튼을 잠급니다.
 
 ---
 
-## 🗺️ 4. Google Maps Platform SDK 연동
+## 🗺️ 5. Google Maps Platform SDK 연동
 * **Geolocation API:** `navigator.geolocation.getCurrentPosition`을 호출해 위경도를 즉석 수집하고 반경 50m 이내 매장 템플릿을 드롭다운에 노출합니다.
 * **Autocomplete API:** 주소 자동완성 입력 양식에 리스너를 결합해, 자동완성 항목 선택 즉시 마커 핀을 렌더링(`renderMiniGoogleMap`)하고 정확한 **Google Place ID**를 취득합니다.
 
 ---
 
-## 📦 5. 빌드 도구 및 패키지 매니저 (Build & Package Management)
+## 📦 6. 빌드 도구 및 패키지 매니저 (Build & Package Management)
 * **패키지 매니저 (pnpm):** 프로젝트 전반의 의존성 관리 도구로 **`pnpm` (Performant npm)**을 채택합니다. 중복 의존성을 하드 링크하여 디스크 공간을 비약적으로 절감하고, 초고속 캐싱 알고리즘을 통해 해커톤 CI/CD 파이프라인 컴파일 빌드 속도를 극한으로 가속합니다.
 * **프론트엔드 번들러 (Vite v5):** 최신 ESM(ES Modules) 기반의 **`Vite` 번들러**를 적용해 100ms대의 초고속 실시간 HMR(Hot Module Replacement)을 활성화하고 프로덕션 고압축 번들 트리를 가동합니다.
-

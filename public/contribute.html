@@ -62,6 +62,21 @@
                 <input type="search" id="contrib-venue" name="venue" autocomplete="off" placeholder="예: 스타벅스 강남역점" required>
               </div>
 
+              <div class="form-field">
+                <label for="contrib-menu-images">메뉴판 사진</label>
+                <input
+                  type="file"
+                  id="contrib-menu-images"
+                  name="menu_images"
+                  accept="image/jpeg,image/png,image/webp"
+                  aria-describedby="contrib-image-help contrib-image-count"
+                  multiple
+                  required
+                >
+                <p class="file-help" id="contrib-image-help">JPG, PNG, WebP 형식으로 최대 10장까지 선택할 수 있습니다. 사진당 4MB, 전체 20MB 이하로 올려 주세요.</p>
+                <p class="image-count" id="contrib-image-count">0 / 10장 선택됨</p>
+              </div>
+
               <button class="primary-action" id="btn-submit-contribution" type="submit">메뉴판 사진 등록 · 150pt</button>
               <div class="contrib-status-msg" id="contrib-status-msg" role="status" aria-live="polite"></div>
             </form>

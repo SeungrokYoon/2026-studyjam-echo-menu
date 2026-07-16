@@ -15,7 +15,7 @@
 * **출력:** 락인 완료된 매장 메타데이터 및 카테고리별 전체 메뉴 템플릿(픽셀 2D 좌표 포함).
 
 ### 1-3. `/api/analyze-frame` (POST)
-* **목적:** 사용자가 전송한 1초 주기 압축 이미지(Base64)와 목표 타겟 메뉴 정보를 받아 Gemini AI로 실시간 프레임을 분석합니다.
+* **목적:** 사용자가 전송한 4초 주기 압축 이미지(Base64)와 목표 타겟 메뉴 정보를 받아 Gemini AI로 프레임을 분석합니다. 프론트엔드는 이전 요청이 끝날 때까지 다음 요청을 보내지 않습니다.
 * **동작:** 프레임 내의 키오스크 화면 경계를 검출하고 목표 메뉴 버튼의 실물 모니터 내 2D 픽셀 범위 좌표(`[Y1, X1, Y2, X2]`)를 역산해 프론트엔드 캐시에 응답합니다.
 
 ### 1-4. `/api/leaderboard` (GET)
@@ -24,6 +24,11 @@
 ### 1-5. `/api/auth/google` (POST)
 * **목적:** 프론트엔드에서 획득한 Google ID Token(JWT)을 전송받아 유효성을 검증하고 기여자의 세션을 인가합니다.
 * **동작:** `google-auth-library` 클라이언트의 `OAuth2Client.verifyIdToken`을 구동하여 서명 위조 여부를 판단하고, 통과 시 이메일 주소를 Firestore Document ID로 하는 `contributors/{email}` 내의 기여 포인트 및 100레벨 공룡 데이터를 Upsert 처리합니다.
+
+### 1-6. `/api/contribute` (POST)
+* **목적:** 기여자 이름, 매장 이름, 메뉴판 이미지 1~10장을 받아 기여 기록과 150포인트를 저장합니다.
+* **검증:** JPG, PNG, WebP Data URL만 허용하며 사진당 4MB, 전체 20MB, 최대 10장 제한을 서버에서 다시 강제합니다.
+* **저장:** 현재 데모 런타임에서는 이미지와 메타데이터를 `db_cache.json`의 `menuContributions`에 저장합니다. Cloud Run 인스턴스 교체 후에도 영구 보존하려면 운영 단계에서 Cloud Storage와 Firestore로 교체해야 합니다.
 
 ---
 

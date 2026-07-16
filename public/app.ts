@@ -29,6 +29,8 @@ let isFreezed: boolean = false; // Screen Freeze 여부
 let isPauseMode: boolean = false;
 let streamInterval: any = null;
 let cameraStream: MediaStream | null = null;
+const FRAME_ANALYSIS_INTERVAL_MS = 4000;
+let frameAnalysisInFlight = false;
 
 // 가상 손가락 좌표 (시연용: 화면 상의 마우스 위치를 가상 손끝 좌표로 연동)
 let fingerX: number = 240;
@@ -1067,7 +1069,7 @@ function startKioskNavigation() {
   speak("1단계. 매장 내 키오스크 탐색을 시작합니다. 휴대폰 후면 카메라를 정면을 향해 들고 천천히 걸어가세요.", () => {
     startAudioSteering();
     if (streamInterval) clearInterval(streamInterval);
-    streamInterval = setInterval(sendVideoFrameToServer, 1000);
+    streamInterval = setInterval(sendVideoFrameToServer, FRAME_ANALYSIS_INTERVAL_MS);
   });
   updateSubtitle("1단계: 매장 내 키오스크 위치 탐색 중. 폰을 정면으로 들어 비추며 걸어가세요.");
   hapticInstructionText.textContent = "키오스크 앞에 도착하면 화면을 두 번 탭하세요.";
@@ -1725,7 +1727,7 @@ function handleTouchpadGesture(e: TouchEvent) {
 }
 
 async function sendVideoFrameToServer() {
-  if (isFreezed) return;
+  if (isFreezed || frameAnalysisInFlight) return;
 
   const base64Image = captureCameraFrame();
   if (!base64Image) return;
@@ -1736,6 +1738,7 @@ async function sendVideoFrameToServer() {
     venueKey: currentVenueKey
   };
 
+  frameAnalysisInFlight = true;
   try {
     const response = await fetch("/api/analyze-frame", {
       method: "POST",
@@ -1755,6 +1758,8 @@ async function sendVideoFrameToServer() {
 
   } catch (err) {
     console.error("Frame send error:", err);
+  } finally {
+    frameAnalysisInFlight = false;
   }
 }
 

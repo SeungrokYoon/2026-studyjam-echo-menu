@@ -21,6 +21,10 @@ app.get("/favicon.ico", (_req, res) => res.status(204).end());
 const apiKey = process.env.GCLOUD_API_KEY || process.env.GEMINI_API_KEY;
 const googleMapsApiKey = process.env.GOOGLE_MAPS_KEY || process.env.GOOGLE_MAPS_API_KEY;
 const geminiModel = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+const MAX_MENU_IMAGES = 10;
+const MAX_IMAGE_SIZE_BYTES = 4 * 1024 * 1024;
+const MAX_TOTAL_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
+const IMAGE_DATA_URL_PATTERN = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/;
 let genAI = null;
 if (apiKey) {
   genAI = new GoogleGenerativeAI(apiKey);
@@ -359,8 +363,39 @@ function simulateMockSteering(state, menu) {
 // 4. 모의 기여 등록 API (기여하기 기능 작동 증명)
 app.post("/api/contribute", (req, res) => {
   try {
-    const { username, venueName } = req.body;
+    const { username, venueName, menuImages } = req.body;
     if (!username || !venueName) return res.status(400).json({ error: "필수 정보가 누락되었습니다." });
+    if (!Array.isArray(menuImages) || menuImages.length === 0) {
+      return res.status(400).json({ error: "메뉴판 사진을 1장 이상 업로드해 주세요." });
+    }
+    if (menuImages.length > MAX_MENU_IMAGES) {
+      return res.status(400).json({ error: `메뉴판 사진은 최대 ${MAX_MENU_IMAGES}장까지 업로드할 수 있습니다.` });
+    }
+
+    let totalImageSize = 0;
+    const normalizedImages = menuImages.map((image, index) => {
+      const match = typeof image?.data === "string" ? image.data.match(IMAGE_DATA_URL_PATTERN) : null;
+      if (!match || image.mimeType !== match[1]) {
+        throw new Error(`메뉴판 사진 ${index + 1}의 형식이 올바르지 않습니다.`);
+      }
+
+      const imageSize = Buffer.byteLength(match[2], "base64");
+      if (imageSize > MAX_IMAGE_SIZE_BYTES) {
+        throw new Error(`메뉴판 사진 ${index + 1}은 4MB 이하여야 합니다.`);
+      }
+      totalImageSize += imageSize;
+
+      return {
+        name: String(image.name || `menu-${index + 1}`).slice(0, 160),
+        mimeType: match[1],
+        size: imageSize,
+        data: image.data
+      };
+    });
+
+    if (totalImageSize > MAX_TOTAL_IMAGE_SIZE_BYTES) {
+      return res.status(400).json({ error: "메뉴판 사진의 전체 크기는 20MB 이하여야 합니다." });
+    }
 
     const db = getDB();
     let contributor = db.contributions.find(c => c.username === username);
@@ -378,11 +413,21 @@ app.post("/api/contribute", (req, res) => {
     // 점수 가산
     contributor.points += 150; // 신규 등록 150점 적립
     contributor.updates += 1;
+    if (!Array.isArray(db.menuContributions)) db.menuContributions = [];
+    db.menuContributions.push({
+      id: `contribution_${Date.now()}`,
+      username,
+      venueName,
+      imageCount: normalizedImages.length,
+      images: normalizedImages,
+      createdAt: new Date().toISOString()
+    });
     saveDB(db);
 
-    res.json({ message: "기여 등록 성공!", data: contributor });
+    res.json({ message: "기여 등록 성공!", data: contributor, imageCount: normalizedImages.length });
   } catch (error) {
-    res.status(500).json({ error: "기여 등록 중 오류 발생" });
+    const message = error instanceof Error ? error.message : "기여 등록 중 오류 발생";
+    res.status(400).json({ error: message });
   }
 });
 
