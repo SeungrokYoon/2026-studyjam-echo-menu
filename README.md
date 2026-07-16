@@ -5,6 +5,12 @@
 ### 🔗 실시간 라이브 데모 배포 주소
 **[https://echo-menu-app-3f67e6oi2a-du.a.run.app](https://echo-menu-app-3f67e6oi2a-du.a.run.app)**
 
+> 카메라·마이크와 터치 제스처를 사용하는 서비스이므로 **모바일 기기로 접속하는 것을 권장합니다.**
+
+<a href="https://echo-menu-app-3f67e6oi2a-du.a.run.app">
+  <img src="docs/assets/echo-menu-live-qr.png" alt="Echo Menu 라이브 데모 모바일 접속 QR 코드" width="280">
+</a>
+
 현재 Cloud Run 배포 리비전: `echo-menu-app-00005-tnw` (2026-07-16, 트래픽 100%)
 
 ---
