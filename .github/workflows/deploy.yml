@@ -1,0 +1,55 @@
+name: Deploy to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - main  # main 브랜치 푸시 시 자동 배포 기동
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }} # GitHub Secrets에 등록할 GCP 프로젝트 ID
+  SERVICE_NAME: echo-menu-service
+  REGION: asia-northeast3
+  ARTIFACT_REPOSITORY: echo-menu-repo # Artifact Registry 저장소 이름
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    # 1. 깃 체크아웃
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # 2. 구글 클라우드 인증 (서비스 계정 키 주입)
+    - name: Google Cloud Auth
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }} # GitHub Secrets에 등록할 서비스 계정 JSON 키
+
+    # 3. Cloud SDK 설정
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        project_id: ${{ env.PROJECT_ID }}
+
+    # 4. Artifact Registry 도커 로그인 인증
+    - name: Docker Auth
+      run: |-
+        gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+    # 5. 도커 이미지 빌드 및 Artifact Registry로 Push
+    - name: Build and Push Container
+      run: |-
+        IMAGE_TAG="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+        echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+    # 6. Artifact Registry에 저장된 이미지로 Cloud Run 배포
+    - name: Deploy to Cloud Run
+      run: |-
+        gcloud run deploy ${{ env.SERVICE_NAME }} \
+          --image ${{ env.IMAGE_TAG }} \
+          --region ${{ env.REGION }} \
+          --platform managed \
+          --allow-unauthenticated \
+          --set-env-vars="GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}"
